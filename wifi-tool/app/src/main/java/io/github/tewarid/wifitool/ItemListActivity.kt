@@ -129,8 +129,8 @@ class ItemListActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = values[position]
             holder.idView.text = item.SSID
-            holder.frequencyView.text = String.format("%1.1f GHz", item.frequency / 1000.0)
-            holder.strengthView.text = item.strength
+            holder.frequencyView.text = item.frequencyView
+            holder.strengthView.text = item.strengthView
 
             with(holder.itemView) {
                 tag = item

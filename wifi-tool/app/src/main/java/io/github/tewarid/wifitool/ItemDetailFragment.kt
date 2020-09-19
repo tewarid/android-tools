@@ -35,7 +35,7 @@ class ItemDetailFragment : Fragment() {
         val rootView = inflater.inflate(R.layout.item_detail, container, false)
 
         item?.let {
-            rootView.findViewById<TextView>(R.id.item_detail).text = "Item details"
+            rootView.findViewById<TextView>(R.id.item_detail).text = it.detailView
         }
 
         return rootView
