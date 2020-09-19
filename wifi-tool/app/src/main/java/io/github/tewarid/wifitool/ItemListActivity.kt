@@ -1,19 +1,26 @@
 package io.github.tewarid.wifitool
 
+import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.net.wifi.ScanResult
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
-import androidx.core.widget.NestedScrollView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.RecyclerView
-import androidx.appcompat.widget.Toolbar
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.snackbar.Snackbar
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.core.app.ActivityCompat
+import androidx.core.widget.NestedScrollView
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
-import io.github.tewarid.wifitool.dummy.DummyContent
 
 /**
  * An activity representing a list of Pings. This activity
@@ -23,7 +30,10 @@ import io.github.tewarid.wifitool.dummy.DummyContent
  * item details. On tablets, the activity presents the list of items and
  * item details side-by-side using two vertical panes.
  */
+@RequiresApi(Build.VERSION_CODES.M)
 class ItemListActivity : AppCompatActivity() {
+
+    private lateinit var wifiManager: WifiManager
 
     /**
      * Whether or not the activity is in two-pane mode, i.e. running on a tablet
@@ -40,8 +50,7 @@ class ItemListActivity : AppCompatActivity() {
         toolbar.title = title
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
+            showScanResults()
         }
 
         if (findViewById<NestedScrollView>(R.id.item_detail_container) != null) {
@@ -52,27 +61,50 @@ class ItemListActivity : AppCompatActivity() {
             twoPane = true
         }
 
-        setupRecyclerView(findViewById(R.id.item_list))
+//        val myIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+//        startActivity(myIntent)
+
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
+
+        wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val wifiScanReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
+                if (success) {
+                    showScanResults()
+                } else {
+                    showScanResults()
+                }
+            }
+        }
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        applicationContext.registerReceiver(wifiScanReceiver, intentFilter)
+        showScanResults()
     }
 
-    private fun setupRecyclerView(recyclerView: RecyclerView) {
-        recyclerView.adapter = SimpleItemRecyclerViewAdapter(this, DummyContent.ITEMS, twoPane)
+    private fun showScanResults() {
+        val results = wifiManager.scanResults
+        ScanResultContent.items = results;
+        val recyclerView: RecyclerView = findViewById(R.id.item_list)
+        recyclerView.adapter = SimpleItemRecyclerViewAdapter(this, results, twoPane)
     }
 
-    class SimpleItemRecyclerViewAdapter(private val parentActivity: ItemListActivity,
-                                        private val values: List<DummyContent.DummyItem>,
-                                        private val twoPane: Boolean) :
-            RecyclerView.Adapter<SimpleItemRecyclerViewAdapter.ViewHolder>() {
+    class SimpleItemRecyclerViewAdapter(
+        private val parentActivity: ItemListActivity,
+        private val values: List<ScanResult>,
+        private val twoPane: Boolean
+    ) : RecyclerView.Adapter<SimpleItemRecyclerViewAdapter.ViewHolder>() {
 
         private val onClickListener: View.OnClickListener
 
         init {
             onClickListener = View.OnClickListener { v ->
-                val item = v.tag as DummyContent.DummyItem
+                val item = v.tag as ScanResult
                 if (twoPane) {
                     val fragment = ItemDetailFragment().apply {
                         arguments = Bundle().apply {
-                            putString(ItemDetailFragment.ARG_ITEM_ID, item.id)
+                            putString(ItemDetailFragment.ARG_ITEM_ID, item.BSSID)
                         }
                     }
                     parentActivity.supportFragmentManager
@@ -81,7 +113,7 @@ class ItemListActivity : AppCompatActivity() {
                             .commit()
                 } else {
                     val intent = Intent(v.context, ItemDetailActivity::class.java).apply {
-                        putExtra(ItemDetailFragment.ARG_ITEM_ID, item.id)
+                        putExtra(ItemDetailFragment.ARG_ITEM_ID, item.BSSID)
                     }
                     v.context.startActivity(intent)
                 }
@@ -96,8 +128,9 @@ class ItemListActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = values[position]
-            holder.idView.text = item.id
-            holder.contentView.text = item.content
+            holder.idView.text = item.SSID
+            holder.frequencyView.text = String.format("%1.1f GHz", item.frequency / 1000.0)
+            holder.strengthView.text = item.strength
 
             with(holder.itemView) {
                 tag = item
@@ -109,7 +142,8 @@ class ItemListActivity : AppCompatActivity() {
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val idView: TextView = view.findViewById(R.id.id_text)
-            val contentView: TextView = view.findViewById(R.id.content)
+            val frequencyView: TextView = view.findViewById(R.id.frequency)
+            val strengthView: TextView = view.findViewById(R.id.strength)
         }
     }
 }
