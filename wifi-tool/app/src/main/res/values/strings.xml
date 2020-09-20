@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Wi-Fi Tool</string>
     <string name="title_item_detail">Wi-Fi SSID</string>
+    <string name="label_connect">Connect</string>
 </resources>

@@ -1,12 +1,20 @@
 package io.github.tewarid.wifitool
 
-import android.R.attr.label
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.*
+import android.net.wifi.ScanResult
+import android.net.wifi.WifiConfiguration
+import android.net.wifi.WifiManager
+import android.net.wifi.WifiNetworkSpecifier
+import android.os.Build
 import android.os.Bundle
 import android.view.MenuItem
+import android.widget.Button
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
@@ -25,14 +33,32 @@ class ItemDetailActivity : AppCompatActivity() {
         setContentView(R.layout.activity_item_detail)
         setSupportActionBar(findViewById(R.id.detail_toolbar))
 
+        val item = ScanResultContent.ITEM_MAP[intent.getStringExtra(ItemDetailFragment.ARG_ITEM_ID)]
+            ?: return
+
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
-            val item = ScanResultContent.ITEM_MAP[intent.getStringExtra(ItemDetailFragment.ARG_ITEM_ID)]
             val clipboard: ClipboardManager =
                 getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("", item?.detailView)
             clipboard.setPrimaryClip(clip)
             Snackbar.make(view, "Text copied to clipboard", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
+        }
+
+        val connectView = findViewById<Button>(R.id.connect)
+        with (item?.capabilities)
+        {
+            when {
+                contains("WEP") || contains("PSK") || contains("EAP") -> connectView.isEnabled = false
+                else -> connectView.isEnabled = true
+            }
+        }
+        connectView.setOnClickListener {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                requestNetwork(item)
+            } else {
+                joinNetwork(item)
+            }
         }
 
         // Show the Up button in the action bar.
@@ -63,6 +89,37 @@ class ItemDetailActivity : AppCompatActivity() {
                     .add(R.id.item_detail_container, fragment)
                     .commit()
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun joinNetwork(network: ScanResult) {
+        val conf = WifiConfiguration()
+        conf.SSID = "\"" + network.SSID + "\""
+        conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wifiManager.addNetwork(conf);
+        for (item in wifiManager.configuredNetworks) {
+            if (item.SSID == conf.SSID) {
+                wifiManager.disconnect()
+                wifiManager.enableNetwork(item.networkId, true)
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun requestNetwork(network: ScanResult) {
+        val specifier = WifiNetworkSpecifier.Builder()
+            .setBssid(MacAddress.fromString(network.BSSID))
+            .build()
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .setNetworkSpecifier(specifier)
+            .build()
+        val connectivityManager =
+            applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
+        val networkCallback: ConnectivityManager.NetworkCallback = ConnectivityManager.NetworkCallback()
+        connectivityManager.requestNetwork(request, networkCallback);
     }
 
     override fun onOptionsItemSelected(item: MenuItem) =
