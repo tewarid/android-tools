@@ -46,13 +46,7 @@ class ItemDetailActivity : AppCompatActivity() {
         }
 
         val connectView = findViewById<Button>(R.id.connect)
-        with (item?.capabilities)
-        {
-            when {
-                contains("WEP") || contains("PSK") || contains("EAP") -> connectView.isEnabled = false
-                else -> connectView.isEnabled = true
-            }
-        }
+        connectView.isEnabled = item?.isOpen
         connectView.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 requestNetwork(item)
