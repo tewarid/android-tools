@@ -143,6 +143,7 @@ class ItemListActivity : AppCompatActivity() {
             holder.idView.text = item.SSID
             holder.frequencyView.text = item.frequencyView
             holder.strengthView.text = item.strengthView
+            holder.securityView.text = if (item.isOpen) "Open" else ""
 
             with(holder.itemView) {
                 tag = item
@@ -156,6 +157,7 @@ class ItemListActivity : AppCompatActivity() {
             val idView: TextView = view.findViewById(R.id.id_text)
             val frequencyView: TextView = view.findViewById(R.id.frequency)
             val strengthView: TextView = view.findViewById(R.id.strength)
+            val securityView: TextView = view.findViewById(R.id.security)
         }
     }
 }
