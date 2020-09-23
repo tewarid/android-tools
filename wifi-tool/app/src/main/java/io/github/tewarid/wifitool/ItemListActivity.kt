@@ -143,7 +143,9 @@ class ItemListActivity : AppCompatActivity() {
             holder.idView.text = item.SSID
             holder.frequencyView.text = item.frequencyView
             holder.strengthView.text = item.strengthView
-            holder.securityView.text = if (item.isOpen) "Open" else ""
+            holder.securityView.visibility = if (item.isOpen) View.VISIBLE else View.GONE
+            val info = parentActivity.wifiManager.connectionInfo
+            holder.connectedView.visibility = if (item.BSSID == info?.bssid) View.VISIBLE else View.GONE
 
             with(holder.itemView) {
                 tag = item
@@ -158,6 +160,7 @@ class ItemListActivity : AppCompatActivity() {
             val frequencyView: TextView = view.findViewById(R.id.frequency)
             val strengthView: TextView = view.findViewById(R.id.strength)
             val securityView: TextView = view.findViewById(R.id.security)
+            val connectedView: TextView = view.findViewById(R.id.connected)
         }
     }
 }

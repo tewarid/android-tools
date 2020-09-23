@@ -2,4 +2,6 @@
     <string name="app_name">Wi-Fi Tool</string>
     <string name="title_item_detail">Wi-Fi SSID</string>
     <string name="label_connect">Connect</string>
+    <string name="connected">Connected</string>
+    <string name="open">Open</string>
 </resources>
