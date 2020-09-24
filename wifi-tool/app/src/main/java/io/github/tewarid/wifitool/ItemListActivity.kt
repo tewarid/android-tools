@@ -20,13 +20,12 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
-import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 
 /**
- * An activity representing a list of Pings. This activity
+ * An activity representing a list of Wi-Fi networks. This activity
  * has different presentations for handset and tablet-size devices. On
  * handsets, the activity presents a list of items, which when touched,
  * lead to a [ItemDetailActivity] representing
@@ -38,12 +37,6 @@ class ItemListActivity : AppCompatActivity() {
 
     private lateinit var wifiManager: WifiManager
 
-    /**
-     * Whether or not the activity is in two-pane mode, i.e. running on a tablet
-     * device.
-     */
-    private var twoPane: Boolean = false
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_item_list)
@@ -54,14 +47,6 @@ class ItemListActivity : AppCompatActivity() {
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener {
             showScanResults()
-        }
-
-        if (findViewById<NestedScrollView>(R.id.item_detail_container) != null) {
-            // The detail container view will be present only in the
-            // large-screen layouts (res/values-w900dp).
-            // If this view is present, then the
-            // activity should be in two-pane mode.
-            twoPane = true
         }
 
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
@@ -96,16 +81,15 @@ class ItemListActivity : AppCompatActivity() {
     }
 
     private fun showScanResults() {
-        val results = wifiManager.scanResults
+        val results = wifiManager?.scanResults
         ScanResultContent.items = results;
         val recyclerView: RecyclerView = findViewById(R.id.item_list)
-        recyclerView.adapter = SimpleItemRecyclerViewAdapter(this, results, twoPane)
+        recyclerView.adapter = SimpleItemRecyclerViewAdapter(this, results)
     }
 
     class SimpleItemRecyclerViewAdapter(
         private val parentActivity: ItemListActivity,
-        private val values: List<ScanResult>,
-        private val twoPane: Boolean
+        private val values: List<ScanResult>
     ) : RecyclerView.Adapter<SimpleItemRecyclerViewAdapter.ViewHolder>() {
 
         private val onClickListener: View.OnClickListener
@@ -113,22 +97,10 @@ class ItemListActivity : AppCompatActivity() {
         init {
             onClickListener = View.OnClickListener { v ->
                 val item = v.tag as ScanResult
-                if (twoPane) {
-                    val fragment = ItemDetailFragment().apply {
-                        arguments = Bundle().apply {
-                            putString(ItemDetailFragment.ARG_ITEM_ID, item.BSSID)
-                        }
-                    }
-                    parentActivity.supportFragmentManager
-                            .beginTransaction()
-                            .replace(R.id.item_detail_container, fragment)
-                            .commit()
-                } else {
-                    val intent = Intent(v.context, ItemDetailActivity::class.java).apply {
-                        putExtra(ItemDetailFragment.ARG_ITEM_ID, item.BSSID)
-                    }
-                    v.context.startActivity(intent)
+                val intent = Intent(v.context, ItemDetailActivity::class.java).apply {
+                    putExtra(ItemDetailFragment.ARG_ITEM_ID, item.BSSID)
                 }
+                v.context.startActivity(intent)
             }
         }
 
