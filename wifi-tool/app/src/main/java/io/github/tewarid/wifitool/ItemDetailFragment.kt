@@ -3,7 +3,6 @@ package io.github.tewarid.wifitool
 import android.net.wifi.ScanResult
 import android.os.Bundle
 import androidx.fragment.app.Fragment
-import com.google.android.material.appbar.CollapsingToolbarLayout
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -25,7 +24,6 @@ class ItemDetailFragment : Fragment() {
         arguments?.let {
             if (it.containsKey(ARG_ITEM_ID)) {
                 item = ScanResultContent.ITEM_MAP[it.getString(ARG_ITEM_ID)]
-                activity?.findViewById<CollapsingToolbarLayout>(R.id.toolbar_layout)?.title = item?.SSID
             }
         }
     }
