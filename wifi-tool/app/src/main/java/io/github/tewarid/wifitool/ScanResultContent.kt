@@ -89,11 +89,11 @@ val ScanResult.InformationElement.bytesHex: String
 val ScanResult.isWEP: Boolean
     get() = capabilities.contains("WEP")
 
-val ScanResult.isWPA: Boolean
+val ScanResult.isPSK: Boolean
     get() = capabilities.contains("PSK")
 
 val ScanResult.isEAP: Boolean
     get() = capabilities.contains("EAP")
 
 val ScanResult.isOpen: Boolean
-    get() = !(isWEP || isWPA || isEAP)
+    get() = !(isWEP || isPSK || isEAP)

@@ -1,11 +1,16 @@
 package io.github.tewarid.wifitool
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
+import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.*
+import android.net.ConnectivityManager
+import android.net.MacAddress
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
@@ -14,8 +19,10 @@ import android.os.Build
 import android.os.Bundle
 import android.view.MenuItem
 import android.widget.Button
+import android.widget.EditText
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.DialogFragment
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
@@ -27,14 +34,16 @@ import com.google.android.material.snackbar.Snackbar
  * item details are presented side-by-side with a list of items
  * in a [ItemListActivity].
  */
-class ItemDetailActivity : AppCompatActivity() {
+class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordDialogListener {
+
+    private lateinit var item: ScanResult
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_item_detail)
         setSupportActionBar(findViewById(R.id.detail_toolbar))
 
-        val item = ScanResultContent.ITEM_MAP[intent.getStringExtra(ItemDetailFragment.ARG_ITEM_ID)]
+        item = ScanResultContent.ITEM_MAP[intent.getStringExtra(ItemDetailFragment.ARG_ITEM_ID)]
             ?: return
 
         findViewById<CollapsingToolbarLayout>(R.id.toolbar_layout)?.title = item.SSID
@@ -49,12 +58,13 @@ class ItemDetailActivity : AppCompatActivity() {
         }
 
         val connectView = findViewById<Button>(R.id.connect)
-        connectView.isEnabled = item?.isOpen
+        connectView.isEnabled = item?.isOpen || item?.isPSK
         connectView.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                requestNetwork(item)
+            if (item.isOpen) {
+                connect(item)
             } else {
-                joinNetwork(item)
+                val dialogFragment = PasswordDialogFragment()
+                dialogFragment.show(supportFragmentManager, "password")
             }
         }
 
@@ -88,11 +98,24 @@ class ItemDetailActivity : AppCompatActivity() {
         }
     }
 
+    private fun connect(item: ScanResult, password: String? = null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            requestNetwork(item, password)
+        } else {
+            joinNetwork(item, password)
+        }
+    }
+
     @SuppressLint("MissingPermission")
-    private fun joinNetwork(network: ScanResult) {
+    private fun joinNetwork(network: ScanResult, password: String? = null) {
         val conf = WifiConfiguration()
-        conf.SSID = "\"" + network.SSID + "\""
-        conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
+        conf.SSID = "\"${network.SSID}\""
+        if (password != null) {
+            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
+            conf.preSharedKey = "\"${password}\""
+        } else {
+            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
+        }
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiManager.addNetwork(conf);
         for (item in wifiManager.configuredNetworks) {
@@ -104,10 +127,13 @@ class ItemDetailActivity : AppCompatActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    private fun requestNetwork(network: ScanResult) {
-        val specifier = WifiNetworkSpecifier.Builder()
+    private fun requestNetwork(network: ScanResult, password: String? = null) {
+        val specifierBuilder = WifiNetworkSpecifier.Builder()
             .setBssid(MacAddress.fromString(network.BSSID))
-            .build()
+        if (password != null) {
+            specifierBuilder.setWpa2Passphrase(password)
+        }
+        val specifier = specifierBuilder.build()
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -120,19 +146,49 @@ class ItemDetailActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem) =
-            when (item.itemId) {
-                android.R.id.home -> {
+        when (item.itemId) {
+            android.R.id.home -> {
 
-                    // This ID represents the Home or Up button. In the case of this
-                    // activity, the Up button is shown. For
-                    // more details, see the Navigation pattern on Android Design:
-                    //
-                    // http://developer.android.com/design/patterns/navigation.html#up-vs-back
+                // This ID represents the Home or Up button. In the case of this
+                // activity, the Up button is shown. For
+                // more details, see the Navigation pattern on Android Design:
+                //
+                // http://developer.android.com/design/patterns/navigation.html#up-vs-back
 
-                    navigateUpTo(Intent(this, ItemListActivity::class.java))
+                navigateUpTo(Intent(this, ItemListActivity::class.java))
 
-                    true
-                }
-                else -> super.onOptionsItemSelected(item)
+                true
             }
+            else -> super.onOptionsItemSelected(item)
+        }
+
+    override fun onPositiveResult(password: String) {
+        connect(item, password)
+    }
+}
+
+class PasswordDialogFragment : DialogFragment() {
+
+    interface PasswordDialogListener {
+        fun onPositiveResult(password: String)
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return activity?.let {
+            val builder = AlertDialog.Builder(it)
+            val inflater = requireActivity().layoutInflater;
+            val customView = inflater.inflate(R.layout.dialog_password, null)
+            builder.setView(customView)
+                .setPositiveButton("Join") { dialog, id ->
+                    val passwordView = customView.findViewById<EditText>(R.id.password)
+                    val password = passwordView.text.toString()
+                    (activity as? ItemDetailActivity)?.onPositiveResult(password)
+                }
+                .setNegativeButton("Cancel") { dialog, id ->
+                    getDialog()?.cancel()
+                }
+            builder.create()
+        } ?: throw IllegalStateException("Activity cannot be null")
+    }
+
 }
