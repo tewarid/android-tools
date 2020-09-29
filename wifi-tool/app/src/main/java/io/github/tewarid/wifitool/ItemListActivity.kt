@@ -1,8 +1,11 @@
 package io.github.tewarid.wifitool
 
 import android.Manifest
+import android.app.AlertDialog
+import android.app.Dialog
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -20,6 +23,7 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
+import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
@@ -50,12 +54,6 @@ class ItemListActivity : AppCompatActivity() {
         }
 
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            val myIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:" + BuildConfig.APPLICATION_ID))
-            startActivity(myIntent)
-            return
-        }
 
         wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val wifiScanReceiver = object : BroadcastReceiver() {
@@ -70,6 +68,18 @@ class ItemListActivity : AppCompatActivity() {
         intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         applicationContext.registerReceiver(wifiScanReceiver, intentFilter)
         startScan()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            val dialogFragment = LocationPermissionDialogFragment()
+            dialogFragment.show(supportFragmentManager, "permission")
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     private fun startScan() {
@@ -135,4 +145,27 @@ class ItemListActivity : AppCompatActivity() {
             val connectedView: TextView = view.findViewById(R.id.connected)
         }
     }
+}
+
+class LocationPermissionDialogFragment : DialogFragment() {
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return activity?.let {
+            val builder = AlertDialog.Builder(it)
+            builder.setMessage("This app requires access to your location to work but you've denied it permission to do so. Would you like to review app permissions to enable location access?")
+                .setPositiveButton("Yes",
+                    DialogInterface.OnClickListener { dialog, id ->
+                        val myIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + BuildConfig.APPLICATION_ID))
+                        startActivity(myIntent)
+                    })
+                .setNegativeButton("No",
+                    DialogInterface.OnClickListener { dialog, id ->
+                        getDialog()?.cancel()
+                    })
+            // Create the AlertDialog object and return it
+            builder.create()
+        } ?: throw IllegalStateException("Activity cannot be null")
+    }
+
 }
