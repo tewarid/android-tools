@@ -1,6 +1,14 @@
 # Wi-Fi Tool
 
-A simple tool to list Wi-Fi networks, view detailed information on each, and connect to open networks.
+A simple tool to
+
+- View visible Wi-Fi networks
+- View details about a network such as center frequency (requires API level 23)
+- View information elements (requires API level 30)
+- Attempt connection to open and WPA2 Wi-Fi networks
+
+## Screenshots
 
 ![Network List](screenshot-1.png)
+
 ![Details](screenshot-2.png)
