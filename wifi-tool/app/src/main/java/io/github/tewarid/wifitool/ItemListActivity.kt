@@ -75,11 +75,11 @@ class ItemListActivity : AppCompatActivity() {
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             val dialogFragment = LocationPermissionDialogFragment()
             dialogFragment.show(supportFragmentManager, "permission")
         }
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     private fun startScan() {
