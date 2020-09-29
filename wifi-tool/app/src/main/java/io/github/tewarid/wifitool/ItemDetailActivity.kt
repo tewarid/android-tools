@@ -7,10 +7,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.MacAddress
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
+import android.net.*
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
@@ -37,6 +34,8 @@ import com.google.android.material.snackbar.Snackbar
 class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordDialogListener {
 
     private lateinit var item: ScanResult
+    private lateinit var wifiManager: WifiManager
+    private lateinit var connectView: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,8 +56,10 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
                     .setAction("Action", null).show()
         }
 
-        val connectView = findViewById<Button>(R.id.connect)
-        connectView.isEnabled = item?.isOpen || item?.isPSK
+        wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+        connectView = findViewById(R.id.connect)
+        connectView.isEnabled = (item?.BSSID != wifiManager.connectionInfo.bssid) && (item?.isOpen || item?.isPSK)
         connectView.setOnClickListener {
             if (item.isOpen) {
                 connect(item)
@@ -116,12 +117,13 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         } else {
             conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
         }
-        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiManager.addNetwork(conf);
         for (item in wifiManager.configuredNetworks) {
             if (item.SSID == conf.SSID) {
                 wifiManager.disconnect()
-                wifiManager.enableNetwork(item.networkId, true)
+                if (wifiManager.enableNetwork(item.networkId, true)) {
+                    connectView.isEnabled = false
+                }
             }
         }
     }
@@ -141,7 +143,11 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             .build()
         val connectivityManager =
             applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
-        val networkCallback: ConnectivityManager.NetworkCallback = ConnectivityManager.NetworkCallback()
+        val networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                connectView.isEnabled = (item?.BSSID != wifiManager.connectionInfo.bssid)
+            }
+        }
         connectivityManager.requestNetwork(request, networkCallback);
     }
 
