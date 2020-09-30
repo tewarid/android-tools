@@ -61,6 +61,8 @@ class ItemListActivity : AppCompatActivity() {
                 val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
                 if (success) {
                     showScanResults()
+                } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    showScanResults()
                 }
             }
         }
