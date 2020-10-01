@@ -78,6 +78,7 @@ val ScanResult.detailView: String
         return sb.toString()
     }
 
+@ExperimentalUnsignedTypes
 val ScanResult.InformationElement.bytesHex: String
     @RequiresApi(Build.VERSION_CODES.R)
     get() {

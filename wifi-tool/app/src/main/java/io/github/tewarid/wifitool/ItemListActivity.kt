@@ -86,6 +86,7 @@ class ItemListActivity : AppCompatActivity() {
 
     private fun startScan() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            @Suppress("DEPRECATION")
             wifiManager.startScan()
         } else {
             showScanResults()
@@ -93,7 +94,7 @@ class ItemListActivity : AppCompatActivity() {
     }
 
     private fun showScanResults() {
-        val results = wifiManager?.scanResults
+        val results = wifiManager.scanResults
         ScanResultContent.items = results;
         val recyclerView: RecyclerView = findViewById(R.id.item_list)
         recyclerView.adapter = SimpleItemRecyclerViewAdapter(this, results)
@@ -156,13 +157,13 @@ class LocationPermissionDialogFragment : DialogFragment() {
             val builder = AlertDialog.Builder(it)
             builder.setMessage("This app requires access to your location to work but you've denied it permission to do so. Would you like to review app permissions to enable location access?")
                 .setPositiveButton("Yes",
-                    DialogInterface.OnClickListener { dialog, id ->
+                    DialogInterface.OnClickListener { _, _ ->
                         val myIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                             Uri.parse("package:" + BuildConfig.APPLICATION_ID))
                         startActivity(myIntent)
                     })
                 .setNegativeButton("No",
-                    DialogInterface.OnClickListener { dialog, id ->
+                    DialogInterface.OnClickListener { _, _ ->
                         getDialog()?.cancel()
                     })
             // Create the AlertDialog object and return it
