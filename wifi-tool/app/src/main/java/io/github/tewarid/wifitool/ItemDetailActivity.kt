@@ -59,7 +59,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
         connectView = findViewById(R.id.connect)
-        connectView.isEnabled = (item.BSSID != wifiManager.connectionInfo.bssid) && (item.isOpen || item.isPSK)
+        connectView.isEnabled = !wifiManager.isConnected(item) && (item.isOpen || item.isPSK)
         connectView.setOnClickListener {
             if (item.isOpen) {
                 connect(item)
@@ -146,7 +146,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                connectView.isEnabled = (item.BSSID != wifiManager.connectionInfo.bssid)
+                connectView.isEnabled = !wifiManager.isConnected(item)
             }
         }
         connectivityManager.requestNetwork(request, networkCallback);

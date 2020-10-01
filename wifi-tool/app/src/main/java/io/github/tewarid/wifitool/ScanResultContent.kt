@@ -1,6 +1,7 @@
 package io.github.tewarid.wifitool
 
 import android.net.wifi.ScanResult
+import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.annotation.RequiresApi
 import java.lang.StringBuilder
@@ -98,3 +99,7 @@ val ScanResult.isEAP: Boolean
 
 val ScanResult.isOpen: Boolean
     get() = !(isWEP || isPSK || isEAP)
+
+fun WifiManager.isConnected(item: ScanResult): Boolean {
+    return item.BSSID == connectionInfo.bssid
+}
