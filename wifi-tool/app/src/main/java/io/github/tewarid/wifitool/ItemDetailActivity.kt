@@ -50,7 +50,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
             val clipboard: ClipboardManager =
                 getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("", item?.detailView)
+            val clip = ClipData.newPlainText("", item.detailView)
             clipboard.setPrimaryClip(clip)
             Snackbar.make(view, "Text copied to clipboard", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
@@ -59,7 +59,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
         connectView = findViewById(R.id.connect)
-        connectView.isEnabled = (item?.BSSID != wifiManager.connectionInfo.bssid) && (item?.isOpen || item?.isPSK)
+        connectView.isEnabled = (item.BSSID != wifiManager.connectionInfo.bssid) && (item.isOpen || item.isPSK)
         connectView.setOnClickListener {
             if (item.isOpen) {
                 connect(item)
@@ -107,6 +107,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         }
     }
 
+    @Suppress("DEPRECATION")
     @SuppressLint("MissingPermission")
     private fun joinNetwork(network: ScanResult, password: String? = null) {
         val conf = WifiConfiguration()
@@ -145,7 +146,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                connectView.isEnabled = (item?.BSSID != wifiManager.connectionInfo.bssid)
+                connectView.isEnabled = (item.BSSID != wifiManager.connectionInfo.bssid)
             }
         }
         connectivityManager.requestNetwork(request, networkCallback);
@@ -185,13 +186,13 @@ class PasswordDialogFragment : DialogFragment() {
             val inflater = requireActivity().layoutInflater;
             val customView = inflater.inflate(R.layout.dialog_password, null)
             builder.setView(customView)
-                .setPositiveButton("Join") { dialog, id ->
+                .setPositiveButton("Join") { _, _ ->
                     val passwordView = customView.findViewById<EditText>(R.id.password)
                     val password = passwordView.text.toString()
                     (activity as? ItemDetailActivity)?.onPositiveResult(password)
                 }
-                .setNegativeButton("Cancel") { dialog, id ->
-                    getDialog()?.cancel()
+                .setNegativeButton("Cancel") { _, _ ->
+                    dialog?.cancel()
                 }
             builder.create()
         } ?: throw IllegalStateException("Activity cannot be null")
