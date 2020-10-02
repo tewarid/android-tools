@@ -40,6 +40,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 class ItemListActivity : AppCompatActivity() {
 
     private lateinit var wifiManager: WifiManager
+    private lateinit var wifiScanReceiver: BroadcastReceiver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,21 +56,12 @@ class ItemListActivity : AppCompatActivity() {
 
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
 
-        wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        val wifiScanReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
-                if (success) {
-                    showScanResults()
-                } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                    showScanResults()
-                }
-            }
-        }
-        val intentFilter = IntentFilter()
-        intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
-        applicationContext.registerReceiver(wifiScanReceiver, intentFilter)
         startScan()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        applicationContext.unregisterReceiver(wifiScanReceiver)
     }
 
     override fun onRequestPermissionsResult(
@@ -85,6 +77,19 @@ class ItemListActivity : AppCompatActivity() {
     }
 
     private fun startScan() {
+        wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wifiScanReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, true)
+                if (success) {
+                    showScanResults()
+                }
+            }
+        }
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        applicationContext.registerReceiver(wifiScanReceiver, intentFilter)
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             @Suppress("DEPRECATION")
             wifiManager.startScan()
@@ -129,8 +134,9 @@ class ItemListActivity : AppCompatActivity() {
             holder.frequencyView.text = item.frequencyView
             holder.strengthView.text = item.strengthView
             holder.securityView.visibility = if (item.isOpen) View.VISIBLE else View.GONE
-            val info = parentActivity.wifiManager.connectionInfo
-            holder.connectedView.visibility = if (item.BSSID == info?.bssid) View.VISIBLE else View.GONE
+            holder.connectedView.visibility =
+                if (parentActivity.wifiManager.isConnected(item)) View.VISIBLE
+                else View.GONE
 
             with(holder.itemView) {
                 tag = item
