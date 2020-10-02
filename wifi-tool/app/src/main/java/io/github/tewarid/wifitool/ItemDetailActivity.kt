@@ -37,6 +37,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     private lateinit var wifiManager: WifiManager
     private lateinit var connectView: Button
 
+    @ExperimentalUnsignedTypes
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_item_detail)
@@ -61,10 +62,10 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         connectView = findViewById(R.id.connect)
         connectView.isEnabled = !wifiManager.isConnected(item) && (item.isOpen || item.isPSK)
         connectView.setOnClickListener {
-            if (item.isOpen) {
+            if (item.isOpen && item.SSID != "") {
                 connect(item)
             } else {
-                val dialogFragment = PasswordDialogFragment()
+                val dialogFragment = PasswordDialogFragment(item)
                 dialogFragment.show(supportFragmentManager, "password")
             }
         }
@@ -99,40 +100,53 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         }
     }
 
-    private fun connect(item: ScanResult, password: String? = null) {
+    private fun connect(item: ScanResult, ssid: String? = null, password: String? = null) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            requestNetwork(item, password)
+            requestNetwork(item, ssid, password)
         } else {
-            joinNetwork(item, password)
+            joinNetwork(item, ssid, password)
         }
     }
 
     @Suppress("DEPRECATION")
     @SuppressLint("MissingPermission")
-    private fun joinNetwork(network: ScanResult, password: String? = null) {
+    private fun joinNetwork(network: ScanResult, ssid: String?, password: String?) {
         val conf = WifiConfiguration()
-        conf.SSID = "\"${network.SSID}\""
+        if (network.SSID == "") {
+            conf.SSID = "\"${ssid}\""
+            conf.hiddenSSID = true
+        } else {
+            conf.SSID = "\"${network.SSID}\""
+        }
         if (password != null) {
             conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
             conf.preSharedKey = "\"${password}\""
         } else {
             conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
         }
-        wifiManager.addNetwork(conf);
+        if (wifiManager.addNetwork(conf) == -1) {
+            return
+        }
         for (item in wifiManager.configuredNetworks) {
             if (item.SSID == conf.SSID) {
                 wifiManager.disconnect()
                 if (wifiManager.enableNetwork(item.networkId, true)) {
                     connectView.isEnabled = false
                 }
+                wifiManager.reconnect()
+                wifiManager.saveConfiguration()
             }
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    private fun requestNetwork(network: ScanResult, password: String? = null) {
+    private fun requestNetwork(network: ScanResult, ssid: String?, password: String?) {
         val specifierBuilder = WifiNetworkSpecifier.Builder()
             .setBssid(MacAddress.fromString(network.BSSID))
+        if (network.SSID == "") {
+            specifierBuilder.setSsid(ssid.toString())
+            specifierBuilder.setIsHiddenSsid(true)
+        }
         if (password != null) {
             specifierBuilder.setWpa2Passphrase(password)
         }
@@ -169,15 +183,15 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             else -> super.onOptionsItemSelected(item)
         }
 
-    override fun onPositiveResult(password: String) {
-        connect(item, password)
+    override fun onPositiveResult(ssid: String, password: String) {
+        connect(item, ssid, password)
     }
 }
 
-class PasswordDialogFragment : DialogFragment() {
+class PasswordDialogFragment(private val item: ScanResult) : DialogFragment() {
 
     interface PasswordDialogListener {
-        fun onPositiveResult(password: String)
+        fun onPositiveResult(ssid: String, password: String)
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -185,11 +199,14 @@ class PasswordDialogFragment : DialogFragment() {
             val builder = AlertDialog.Builder(it)
             val inflater = requireActivity().layoutInflater;
             val customView = inflater.inflate(R.layout.dialog_password, null)
+            val ssidView = customView.findViewById<EditText>(R.id.ssid)
+            ssidView.setText(item.SSID)
+            val passwordView = customView.findViewById<EditText>(R.id.password)
             builder.setView(customView)
                 .setPositiveButton("Join") { _, _ ->
-                    val passwordView = customView.findViewById<EditText>(R.id.password)
+                    val ssid = ssidView.text.toString()
                     val password = passwordView.text.toString()
-                    (activity as? ItemDetailActivity)?.onPositiveResult(password)
+                    (activity as? ItemDetailActivity)?.onPositiveResult(ssid, password)
                 }
                 .setNegativeButton("Cancel") { _, _ ->
                     dialog?.cancel()
