@@ -134,7 +134,7 @@ class ItemListActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = values[position]
-            holder.idView.text = item.SSID
+            holder.idView.text = if (item.SSID == "") parentActivity.resources.getString(R.string.ssid_hidden) else item.SSID
             holder.frequencyView.text = item.frequencyView
             holder.strengthView.text = item.strengthView
             holder.securityView.visibility = if (item.isOpen) View.VISIBLE else View.GONE
