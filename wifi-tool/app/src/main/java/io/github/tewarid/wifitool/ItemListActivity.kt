@@ -51,17 +51,19 @@ class ItemListActivity : AppCompatActivity() {
         toolbar.title = title
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener {
-            showScanResults()
+            startScan()
         }
 
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
 
+        registerBroadcastReceiver()
         startScan()
+        showScanResults()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        applicationContext.unregisterReceiver(wifiScanReceiver)
+        unregisterBroadcastReceiver()
     }
 
     override fun onRequestPermissionsResult(
@@ -76,7 +78,7 @@ class ItemListActivity : AppCompatActivity() {
         }
     }
 
-    private fun startScan() {
+    private fun registerBroadcastReceiver() {
         wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiScanReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -89,13 +91,15 @@ class ItemListActivity : AppCompatActivity() {
         val intentFilter = IntentFilter()
         intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         applicationContext.registerReceiver(wifiScanReceiver, intentFilter)
+    }
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            @Suppress("DEPRECATION")
-            wifiManager.startScan()
-        } else {
-            showScanResults()
-        }
+    private fun unregisterBroadcastReceiver() {
+        applicationContext.unregisterReceiver(wifiScanReceiver)
+    }
+
+    private fun startScan() {
+        @Suppress("DEPRECATION")
+        wifiManager.startScan()
     }
 
     private fun showScanResults() {
