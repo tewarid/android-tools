@@ -42,6 +42,7 @@ val ScanResult.wifiStandardView: String
         return "WIFI_STANDARD_UNKNOWN"
     }
 
+@ExperimentalUnsignedTypes
 val ScanResult.detailView: String
     get() {
         val sb = StringBuilder()
