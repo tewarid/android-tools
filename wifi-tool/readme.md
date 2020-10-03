@@ -2,10 +2,12 @@
 
 A simple tool to
 
-- View visible Wi-Fi networks
-- View details about a network such as center frequency (requires API level 23)
-- View information elements (requires API level 30)
-- Attempt connection to open and WPA2 Wi-Fi networks
+* View visible Wi-Fi networks
+* View details about a Wi-Fi network
+  * Center frequency and more (on Android  API level 23)
+  * Information elements (requires API level 30)
+* Attempt connection to open and WPA3 (or WPA2) Wi-Fi networks
+  * Disconnects from Wi-Fi network automatically such as on screen rotation
 
 ## Screenshots
 

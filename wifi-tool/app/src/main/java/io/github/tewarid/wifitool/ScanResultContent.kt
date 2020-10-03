@@ -101,6 +101,9 @@ val ScanResult.isEAP: Boolean
 val ScanResult.isOpen: Boolean
     get() = !(isWEP || isPSK || isEAP)
 
+val ScanResult.isWPA3: Boolean
+    get() = capabilities.contains("WPA3")
+
 fun WifiManager.isConnected(item: ScanResult): Boolean {
     return item.BSSID == connectionInfo.bssid
 }

@@ -36,6 +36,10 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     private lateinit var item: ScanResult
     private lateinit var wifiManager: WifiManager
     private lateinit var connectView: Button
+    @Suppress("DEPRECATION")
+    private var wifiConfig: WifiConfiguration? = null
+    private lateinit var connectivityManager: ConnectivityManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     @ExperimentalUnsignedTypes
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,18 +74,8 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             }
         }
 
-        // Show the Up button in the action bar.
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        // savedInstanceState is non-null when there is fragment state
-        // saved from previous configurations of this activity
-        // (e.g. when rotating the screen from portrait to landscape).
-        // In this case, the fragment will automatically be re-added
-        // to its container so we don"t need to manually add it.
-        // For more information, see the Fragments API guide at:
-        //
-        // http://developer.android.com/guide/components/fragments.html
-        //
         if (savedInstanceState == null) {
             // Create the detail fragment and add it to the activity
             // using a fragment transaction.
@@ -100,6 +94,17 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    override fun onDestroy() {
+        super.onDestroy()
+        if (networkCallback != null) {
+            connectivityManager.unregisterNetworkCallback(networkCallback as ConnectivityManager.NetworkCallback)
+        } else if (wifiConfig != null) {
+            @Suppress("DEPRECATION")
+            (wifiConfig?.networkId?.let { wifiManager.removeNetwork(it) })
+        }
+    }
+
     private fun connect(item: ScanResult, ssid: String? = null, password: String? = null) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             requestNetwork(item, ssid, password)
@@ -111,44 +116,66 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     @Suppress("DEPRECATION")
     @SuppressLint("MissingPermission")
     private fun joinNetwork(network: ScanResult, ssid: String?, password: String?) {
-        val conf = WifiConfiguration()
+        wifiConfig = WifiConfiguration()
         if (network.SSID == "") {
-            conf.SSID = "\"${ssid}\""
-            conf.hiddenSSID = true
+            wifiConfig?.SSID = "\"${ssid}\""
+            wifiConfig?.hiddenSSID = true
         } else {
-            conf.SSID = "\"${network.SSID}\""
+            wifiConfig?.SSID = "\"${network.SSID}\""
         }
         if (password != null) {
-            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
-            conf.preSharedKey = "\"${password}\""
+            wifiConfig?.allowedKeyManagement?.set(WifiConfiguration.KeyMgmt.WPA_PSK)
+            wifiConfig?.preSharedKey = "\"${password}\""
         } else {
-            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
+            wifiConfig?.allowedKeyManagement?.set(WifiConfiguration.KeyMgmt.NONE)
         }
-        if (wifiManager.addNetwork(conf) == -1) {
-            return
+        var id = findNetworkId(network, ssid)
+        if (id == -1) {
+            if (wifiManager.addNetwork(wifiConfig) == -1) {
+                return
+            }
+            id = findNetworkId(network, ssid)
+        } else {
+            wifiConfig = null
         }
+        wifiManager.disconnect()
+        if (wifiManager.enableNetwork(id, true)) {
+            connectView.isEnabled = false
+            wifiConfig?.networkId = id
+        } else {
+            wifiConfig = null
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun findNetworkId(network: ScanResult, ssid: String?): Int {
         for (item in wifiManager.configuredNetworks) {
-            if (item.SSID == conf.SSID) {
-                wifiManager.disconnect()
-                if (wifiManager.enableNetwork(item.networkId, true)) {
-                    connectView.isEnabled = false
-                }
-                wifiManager.reconnect()
-                wifiManager.saveConfiguration()
+            if (item.SSID == wifiConfig?.SSID) {
+                return item.networkId
             }
         }
+        return -1
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun requestNetwork(network: ScanResult, ssid: String?, password: String?) {
         val specifierBuilder = WifiNetworkSpecifier.Builder()
-            .setBssid(MacAddress.fromString(network.BSSID))
         if (network.SSID == "") {
-            specifierBuilder.setSsid(ssid.toString())
-            specifierBuilder.setIsHiddenSsid(true)
+            if (ssid != null && ssid != "") {
+                specifierBuilder.setSsid(ssid.toString())
+                specifierBuilder.setIsHiddenSsid(true)
+            } else {
+                return
+            }
+        } else {
+            specifierBuilder.setSsid(network.SSID)
         }
-        if (password != null) {
-            specifierBuilder.setWpa2Passphrase(password)
+        if (password != null && password != "") {
+            if (network.isWPA3) {
+                specifierBuilder.setWpa3Passphrase(password)
+            } else {
+                specifierBuilder.setWpa2Passphrase(password)
+            }
         }
         val specifier = specifierBuilder.build()
         val request = NetworkRequest.Builder()
@@ -156,14 +183,19 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .setNetworkSpecifier(specifier)
             .build()
-        val connectivityManager =
-            applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
-        val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        connectivityManager = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                connectView.isEnabled = !wifiManager.isConnected(item)
+                if (wifiManager.isConnected(item)) {
+                    connectView.isEnabled = false
+                } else {
+                    networkCallback = null
+                }
             }
         }
-        connectivityManager.requestNetwork(request, networkCallback);
+        connectivityManager.requestNetwork(request,
+            networkCallback as ConnectivityManager.NetworkCallback
+        );
     }
 
     override fun onOptionsItemSelected(item: MenuItem) =
