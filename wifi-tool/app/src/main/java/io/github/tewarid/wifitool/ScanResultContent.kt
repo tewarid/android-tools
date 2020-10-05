@@ -8,7 +8,7 @@ import java.lang.StringBuilder
 
 object ScanResultContent {
 
-    lateinit var ITEMS: List<ScanResult>
+    private lateinit var ITEMS: List<ScanResult>
 
     val ITEM_MAP: MutableMap<String, ScanResult> = HashMap()
 
@@ -46,34 +46,38 @@ val ScanResult.wifiStandardView: String
 val ScanResult.detailView: String
     get() {
         val sb = StringBuilder()
-        sb
-            .append(String.format("SSID:\n\t%s\n\n", SSID))
-            .append(String.format("BSSID:\n\t%s\n\n", BSSID))
-            .append(String.format("Capabilities:\n\t%s\n\n", capabilities.replace("][", "]\n\t[")))
-            .append(String.format("Frequency:\n\t%s\n\n", frequencyView))
-            .append(String.format("Strength:\n\t%s\n\n", strengthView))
+        with(sb) {
+            append("SSID:\n\t$SSID\n\n")
+            append("BSSID:\n\t$BSSID\n\n")
+            append("Capabilities:\n\t${capabilities.replace("][", "]\n\t[")}\n\n")
+            append("Frequency:\n\t$frequencyView\n\n")
+            append("Strength:\n\t$strengthView\n\n")
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            sb
-                .append(String.format("API Level %s\n\n", Build.VERSION_CODES.M))
-                .append(String.format("centerFreq0:\n\t%d MHz\n\n", centerFreq0))
-                .append(String.format("centerFreq1:\n\t%d MHz\n\n", centerFreq1))
-                .append(String.format("Channel Width:\n\t%d MHz\n\n", channelWidth))
-                .append(String.format("Passpoint operator name:\n\t%s\n\n", operatorFriendlyName))
-                .append(String.format("Venue name:\n\t%s\n\n", venueName))
+            with(sb) {
+                append("API Level ${Build.VERSION_CODES.M}\n\n")
+                append(String.format("centerFreq0:\n\t%d MHz\n\n", centerFreq0))
+                append(String.format("centerFreq1:\n\t%d MHz\n\n", centerFreq1))
+                append(String.format("Channel Width:\n\t%d MHz\n\n", channelWidth))
+                append("Passpoint operator name:\n\t$operatorFriendlyName\n\n")
+                append("Venue name:\n\t$venueName\n\n")
+            }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            sb
-                .append(String.format("API Level %s\n\n", Build.VERSION_CODES.R))
-                .append(String.format("Wi-Fi Standard:\n\t%s\n\n", wifiStandardView))
-                .append(String.format("Information Elements:\n"))
+            with(sb) {
+                append("API Level ${Build.VERSION_CODES.R}\n\n")
+                append("Wi-Fi Standard:\n\t$wifiStandardView\n\n")
+                append("Information Elements:\n")
+            }
             for (item in informationElements) {
-                sb
-                    .append("\n")
-                    .append(String.format("\tElement ID: %d\n", item.id))
-                    .append(String.format("\tElement ID Extension: %d\n", item.idExt))
-                    .append(String.format("\tBytes: %s\n", item.bytesHex))
+                with(sb) {
+                    append("\n")
+                    append(String.format("\tElement ID: %d\n", item.id))
+                    append(String.format("\tElement ID Extension: %d\n", item.idExt))
+                    append("\tBytes: ${item.bytesHex}\n")
+                }
             }
         }
 

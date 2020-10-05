@@ -1,8 +1,11 @@
 <resources>
     <string name="app_name">Wi-Fi Tool</string>
     <string name="ssid_hidden">SSID Hidden</string>
-    <string name="label_connect">Connect</string>
+    <string name="connect">Connect</string>
     <string name="connected">Connected</string>
     <string name="open">Open</string>
     <string name="password">password</string>
+    <string name="discover">Discover Service</string>
+    <string name="service_type_hint">_homekit</string>
+    <string name="protocol_hint">_tcp</string>
 </resources>

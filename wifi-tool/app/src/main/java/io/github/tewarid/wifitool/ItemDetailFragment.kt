@@ -17,6 +17,7 @@ import android.widget.TextView
 class ItemDetailFragment : Fragment() {
 
     private var item: ScanResult? = null
+    private lateinit var itemDetailView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,11 +33,18 @@ class ItemDetailFragment : Fragment() {
                               savedInstanceState: Bundle?): View? {
         val rootView = inflater.inflate(R.layout.item_detail, container, false)
 
+        itemDetailView = rootView.findViewById<TextView>(R.id.item_detail)
         item?.let {
-            rootView.findViewById<TextView>(R.id.item_detail).text = it.detailView
+            itemDetailView.text = it.detailView
         }
 
         return rootView
+    }
+
+    fun setDetails(text: String?) {
+        activity?.runOnUiThread {
+            itemDetailView.text = text
+        }
     }
 
     companion object {

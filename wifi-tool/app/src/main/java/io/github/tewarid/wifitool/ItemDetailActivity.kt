@@ -1,28 +1,27 @@
 package io.github.tewarid.wifitool
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
-import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.*
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuInflater
 import android.view.MenuItem
-import android.widget.Button
-import android.widget.EditText
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.fragment.app.DialogFragment
-import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
+import java.lang.StringBuilder
 
 
 /**
@@ -31,15 +30,18 @@ import com.google.android.material.snackbar.Snackbar
  * item details are presented side-by-side with a list of items
  * in a [ItemListActivity].
  */
-class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordDialogListener {
+class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordDialogListener, DiscoveryDialogFragment.DiscoveryDialogListener {
 
-    private lateinit var item: ScanResult
+    private lateinit var scanResult: ScanResult
     private lateinit var wifiManager: WifiManager
-    private lateinit var connectView: Button
     @Suppress("DEPRECATION")
     private var wifiConfig: WifiConfiguration? = null
     private lateinit var connectivityManager: ConnectivityManager
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private lateinit var fragment: ItemDetailFragment
+    private var discoveryListener: NsdManager.DiscoveryListener? = null
+    private lateinit var nsdManager: NsdManager
+    private val SERVICE_MAP: MutableMap<String, NsdServiceInfo> = HashMap()
 
     @ExperimentalUnsignedTypes
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,15 +49,15 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         setContentView(R.layout.activity_item_detail)
         setSupportActionBar(findViewById(R.id.detail_toolbar))
 
-        item = ScanResultContent.ITEM_MAP[intent.getStringExtra(ItemDetailFragment.ARG_ITEM_ID)]
+        scanResult = ScanResultContent.ITEM_MAP[intent.getStringExtra(ItemDetailFragment.ARG_ITEM_ID)]
             ?: return
 
-        findViewById<CollapsingToolbarLayout>(R.id.toolbar_layout)?.title = item.SSID
+        this.title = scanResult.SSID
 
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
             val clipboard: ClipboardManager =
                 getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("", item.detailView)
+            val clip = ClipData.newPlainText("", scanResult.detailView)
             clipboard.setPrimaryClip(clip)
             Snackbar.make(view, "Text copied to clipboard", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
@@ -63,23 +65,10 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
 
         wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
-        connectView = findViewById(R.id.connect)
-        connectView.isEnabled = !wifiManager.isConnected(item) && (item.isOpen || item.isPSK)
-        connectView.setOnClickListener {
-            if (item.isOpen && item.SSID != "") {
-                connect(item)
-            } else {
-                val dialogFragment = PasswordDialogFragment(item)
-                dialogFragment.show(supportFragmentManager, "password")
-            }
-        }
-
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         if (savedInstanceState == null) {
-            // Create the detail fragment and add it to the activity
-            // using a fragment transaction.
-            val fragment = ItemDetailFragment().apply {
+            fragment = ItemDetailFragment().apply {
                 arguments = Bundle().apply {
                     putString(
                         ItemDetailFragment.ARG_ITEM_ID,
@@ -91,6 +80,8 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             supportFragmentManager.beginTransaction()
                     .add(R.id.item_detail_container, fragment)
                     .commit()
+        } else {
+            fragment = supportFragmentManager.findFragmentById(R.id.item_detail_container) as ItemDetailFragment
         }
     }
 
@@ -103,6 +94,16 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             @Suppress("DEPRECATION")
             (wifiConfig?.networkId?.let { wifiManager.removeNetwork(it) })
         }
+        if (discoveryListener != null) {
+            nsdManager.stopServiceDiscovery(discoveryListener)
+        }
+        SERVICE_MAP.clear()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        val inflater: MenuInflater = menuInflater
+        inflater.inflate(R.menu.detail_menu, menu)
+        return true
     }
 
     private fun connect(item: ScanResult, ssid: String? = null, password: String? = null) {
@@ -116,7 +117,9 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     @Suppress("DEPRECATION")
     @SuppressLint("MissingPermission")
     private fun joinNetwork(network: ScanResult, ssid: String?, password: String?) {
+        if (wifiConfig != null) return
         wifiConfig = WifiConfiguration()
+        wifiConfig?.BSSID = network.BSSID
         if (network.SSID == "") {
             wifiConfig?.SSID = "\"${ssid}\""
             wifiConfig?.hiddenSSID = true
@@ -140,7 +143,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         }
         wifiManager.disconnect()
         if (wifiManager.enableNetwork(id, true)) {
-            connectView.isEnabled = false
+            invalidateOptionsMenu()
             wifiConfig?.networkId = id
         } else {
             wifiConfig = null
@@ -159,7 +162,9 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
 
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun requestNetwork(network: ScanResult, ssid: String?, password: String?) {
+        if (networkCallback != null) return
         val specifierBuilder = WifiNetworkSpecifier.Builder()
+        specifierBuilder.setBssid(MacAddress.fromString(network.BSSID))
         if (network.SSID == "") {
             if (ssid != null && ssid != "") {
                 specifierBuilder.setSsid(ssid.toString())
@@ -186,65 +191,106 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         connectivityManager = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager;
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                if (wifiManager.isConnected(item)) {
-                    connectView.isEnabled = false
+                if (wifiManager.isConnected(scanResult)) {
+                    invalidateOptionsMenu()
                 } else {
                     networkCallback = null
                 }
             }
         }
-        connectivityManager.requestNetwork(request,
-            networkCallback as ConnectivityManager.NetworkCallback
-        );
+        connectivityManager.requestNetwork(request, networkCallback as ConnectivityManager.NetworkCallback);
     }
 
     override fun onOptionsItemSelected(item: MenuItem) =
         when (item.itemId) {
             android.R.id.home -> {
-
-                // This ID represents the Home or Up button. In the case of this
-                // activity, the Up button is shown. For
-                // more details, see the Navigation pattern on Android Design:
-                //
-                // http://developer.android.com/design/patterns/navigation.html#up-vs-back
-
                 navigateUpTo(Intent(this, ItemListActivity::class.java))
-
+                true
+            }
+            R.id.connect -> {
+                if (scanResult.isOpen && scanResult.SSID != "") {
+                    connect(scanResult)
+                } else {
+                    val dialogFragment = PasswordDialogFragment(scanResult)
+                    dialogFragment.show(supportFragmentManager, "password")
+                }
+                true
+            }
+            R.id.discover -> {
+                val dialogFragment = DiscoveryDialogFragment()
+                dialogFragment.show(supportFragmentManager, "discovery")
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
 
-    override fun onPositiveResult(ssid: String, password: String) {
-        connect(item, ssid, password)
-    }
-}
-
-class PasswordDialogFragment(private val item: ScanResult) : DialogFragment() {
-
-    interface PasswordDialogListener {
-        fun onPositiveResult(ssid: String, password: String)
+    override fun onPrepareOptionsMenu(menu: Menu?): Boolean {
+        super.onPrepareOptionsMenu(menu)
+        menu?.findItem(R.id.connect)?.isEnabled = !wifiManager.isConnected(scanResult) && (scanResult.isOpen || scanResult.isPSK)
+        menu?.findItem(R.id.discover)?.isEnabled = wifiManager.isConnected(scanResult) && discoveryListener == null
+        return true
     }
 
-    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        return activity?.let {
-            val builder = AlertDialog.Builder(it)
-            val inflater = requireActivity().layoutInflater;
-            val customView = inflater.inflate(R.layout.dialog_password, null)
-            val ssidView = customView.findViewById<EditText>(R.id.ssid)
-            ssidView.setText(item.SSID)
-            val passwordView = customView.findViewById<EditText>(R.id.password)
-            builder.setView(customView)
-                .setPositiveButton("Join") { _, _ ->
-                    val ssid = ssidView.text.toString()
-                    val password = passwordView.text.toString()
-                    (activity as? ItemDetailActivity)?.onPositiveResult(ssid, password)
+    override fun onPasswordDialogResult(ssid: String, password: String) {
+        connect(scanResult, ssid, password)
+    }
+
+    override fun onDiscoveryDialogResult(securityType: String, protocol: String) {
+        startServiceDiscovery(securityType, protocol)
+        invalidateOptionsMenu()
+    }
+
+    private fun startServiceDiscovery(serviceType: String, protocol: String) {
+        discoveryListener = object : NsdManager.DiscoveryListener {
+            override fun onServiceFound(service: NsdServiceInfo) {
+                val resolveListener = object : NsdManager.ResolveListener {
+                    override fun onResolveFailed(serviceInfo: NsdServiceInfo?, errorCode: Int) { }
+                    override fun onServiceResolved(serviceInfo: NsdServiceInfo?) {
+                        if (serviceInfo != null) {
+                            addService(serviceInfo)
+                        }
+                    }
                 }
-                .setNegativeButton("Cancel") { _, _ ->
-                    dialog?.cancel()
-                }
-            builder.create()
-        } ?: throw IllegalStateException("Activity cannot be null")
+                nsdManager.resolveService(service, resolveListener)
+            }
+            override fun onServiceLost(service: NsdServiceInfo) {
+                removeService(service)
+            }
+            override fun onDiscoveryStarted(serviceType: String?) { }
+            override fun onDiscoveryStopped(serviceType: String) { }
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+                discoveryListener = null
+            }
+            override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) { }
+        }
+        nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
+        nsdManager.discoverServices("${serviceType}.${protocol}", NsdManager.PROTOCOL_DNS_SD, discoveryListener)
     }
 
+    private fun addService(serviceInfo: NsdServiceInfo) {
+        if (SERVICE_MAP.containsKey(serviceInfo.serviceName)) {
+            SERVICE_MAP.remove(serviceInfo.serviceName)
+        }
+        SERVICE_MAP[serviceInfo.serviceName] = serviceInfo
+        refreshDetails()
+    }
+
+    private fun removeService(serviceInfo: NsdServiceInfo) {
+        if (SERVICE_MAP.remove(serviceInfo.serviceName) != null) {
+            refreshDetails()
+        }
+    }
+
+    private fun refreshDetails() {
+        val sb = StringBuilder()
+            .append("\nDiscovered Network Service(s):\n")
+        for (item in SERVICE_MAP.values) {
+            with(sb) {
+                append("\n\tService: ${item.serviceType}\n")
+                append("\tHost: ${item.host}\n")
+                append("\tPort: ${item.port}\n")
+            }
+        }
+        fragment.setDetails(scanResult.detailView + sb.toString())
+    }
 }
