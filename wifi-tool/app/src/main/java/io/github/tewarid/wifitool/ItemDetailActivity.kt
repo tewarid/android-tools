@@ -42,6 +42,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private lateinit var nsdManager: NsdManager
     private val SERVICE_MAP: MutableMap<String, NsdServiceInfo> = HashMap()
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     @ExperimentalUnsignedTypes
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,16 +89,8 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     override fun onDestroy() {
         super.onDestroy()
-        if (networkCallback != null) {
-            connectivityManager.unregisterNetworkCallback(networkCallback as ConnectivityManager.NetworkCallback)
-        } else if (wifiConfig != null) {
-            @Suppress("DEPRECATION")
-            (wifiConfig?.networkId?.let { wifiManager.removeNetwork(it) })
-        }
-        if (discoveryListener != null) {
-            nsdManager.stopServiceDiscovery(discoveryListener)
-        }
-        SERVICE_MAP.clear()
+        leaveNetwork()
+        stopServiceDiscovery()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -201,6 +194,16 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         connectivityManager.requestNetwork(request, networkCallback as ConnectivityManager.NetworkCallback);
     }
 
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun leaveNetwork() {
+        if (networkCallback != null) {
+            connectivityManager.unregisterNetworkCallback(networkCallback as ConnectivityManager.NetworkCallback)
+        } else if (wifiConfig != null) {
+            @Suppress("DEPRECATION")
+            (wifiConfig?.networkId?.let { wifiManager.removeNetwork(it) })
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem) =
         when (item.itemId) {
             android.R.id.home -> {
@@ -241,6 +244,9 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
     }
 
     private fun startServiceDiscovery(serviceType: String, protocol: String) {
+        multicastLock = wifiManager.createMulticastLock("WIFI_TOOL")
+        multicastLock?.setReferenceCounted(true)
+        multicastLock?.acquire()
         discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onServiceFound(service: NsdServiceInfo) {
                 val resolveListener = object : NsdManager.ResolveListener {
@@ -292,5 +298,14 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
             }
         }
         fragment.setDetails(scanResult.detailView + sb.toString())
+    }
+
+    private fun stopServiceDiscovery() {
+        if (discoveryListener != null) {
+            nsdManager.stopServiceDiscovery(discoveryListener)
+            multicastLock?.release()
+            multicastLock = null
+        }
+        SERVICE_MAP.clear()
     }
 }
