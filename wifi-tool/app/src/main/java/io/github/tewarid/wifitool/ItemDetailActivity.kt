@@ -58,7 +58,7 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
             val clipboard: ClipboardManager =
                 getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("", scanResult.detailView)
+            val clip = ClipData.newPlainText("", fragment.getDetails())
             clipboard.setPrimaryClip(clip)
             Snackbar.make(view, "Text copied to clipboard", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
@@ -125,12 +125,12 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         } else {
             wifiConfig?.allowedKeyManagement?.set(WifiConfiguration.KeyMgmt.NONE)
         }
-        var id = findNetworkId(network, ssid)
+        var id = findNetworkId()
         if (id == -1) {
             if (wifiManager.addNetwork(wifiConfig) == -1) {
                 return
             }
-            id = findNetworkId(network, ssid)
+            id = findNetworkId()
         } else {
             wifiConfig = null
         }
@@ -143,8 +143,9 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         }
     }
 
+    @Suppress("DEPRECATION")
     @SuppressLint("MissingPermission")
-    private fun findNetworkId(network: ScanResult, ssid: String?): Int {
+    private fun findNetworkId(): Int {
         for (item in wifiManager.configuredNetworks) {
             if (item.SSID == wifiConfig?.SSID) {
                 return item.networkId
@@ -287,14 +288,23 @@ class ItemDetailActivity : AppCompatActivity(), PasswordDialogFragment.PasswordD
         }
     }
 
+    @ExperimentalUnsignedTypes
     private fun refreshDetails() {
         val sb = StringBuilder()
             .append("\nDiscovered Network Service(s):\n")
         for (item in SERVICE_MAP.values) {
             with(sb) {
                 append("\n\tService: ${item.serviceType}\n")
+                append("\tName: ${item.serviceName}\n")
                 append("\tHost: ${item.host}\n")
                 append("\tPort: ${item.port}\n")
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP)
+                    return
+                append("\tAttributes:\n")
+                for (key in item.attributes.keys) {
+                    val bytesHex = item.attributes[key]?.toUByteArray()?.joinToString(" ") { it.toString(16).padStart(2, '0') }
+                    append("\t\t$key: ${bytesHex}\n")
+                }
             }
         }
         fragment.setDetails(scanResult.detailView + sb.toString())

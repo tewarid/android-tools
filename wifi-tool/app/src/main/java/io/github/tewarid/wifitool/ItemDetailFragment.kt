@@ -47,6 +47,10 @@ class ItemDetailFragment : Fragment() {
         }
     }
 
+    fun getDetails(): String {
+        return itemDetailView.text.toString()
+    }
+
     companion object {
         /**
          * The fragment argument representing the item ID that this fragment
