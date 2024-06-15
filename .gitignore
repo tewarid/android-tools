@@ -154,3 +154,5 @@ build-iPhoneSimulator/
 
 # Local History for Visual Studio Code
 .history/
+
+api*.json
